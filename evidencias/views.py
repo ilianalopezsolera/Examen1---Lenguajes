@@ -4,10 +4,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 import cloudinary.uploader
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from .models import EvidenciaProyecto
 from .serializers import EvidenciaSerializer
-
 
 @api_view(['GET'])
 def health(request):
@@ -21,13 +21,15 @@ class EvidenciaViewSet(viewsets.ModelViewSet):
     queryset = EvidenciaProyecto.objects.all()
     serializer_class = EvidenciaSerializer
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     filterset_fields = ['categoria']
     search_fields = ['titulo', 'proyecto']
     ordering_fields = ['fecha_registro']
 
     def create(self, request, *args, **kwargs):
-        archivo = request.FILES.get('archivo')
+
+        archivo = request.FILES.get('archivo') or request.data.get('archivo')
 
         if not archivo:
             return Response(
