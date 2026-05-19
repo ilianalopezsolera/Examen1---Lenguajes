@@ -19,32 +19,9 @@ from .serializers import EvidenciaSerializer
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])  # health no requiere autenticación
+@permission_classes([AllowAny])
 def health(request):
     return Response({'status': 'ok'})
-
-
-def subir_archivo_cloudinary(archivo):
-    """Sube un archivo a Cloudinary y retorna los datos relevantes."""
-
-    import cloudinary
-    print("CLOUD NAME:", cloudinary.config().cloud_name)
-    print("API KEY:", cloudinary.config().api_key)
-    print("API SECRET:", cloudinary.config().api_secret)
-    
-    resultado = cloudinary.uploader.upload(
-        archivo,
-        folder='evidencias_proyectos',
-        resource_type='auto'
-    )
-    return {
-        'archivo_url': resultado['secure_url'],
-        'nombre_archivo': archivo.name,
-        'tipo_archivo': archivo.content_type,
-        'tamano_archivo': archivo.size,
-
-    
-    }
 
 
 class EvidenciaViewSet(viewsets.ModelViewSet):
@@ -58,45 +35,138 @@ class EvidenciaViewSet(viewsets.ModelViewSet):
     search_fields = ['titulo', 'proyecto', 'responsable']
     ordering_fields = ['fecha_registro', 'titulo', 'proyecto']
 
+    def subir_archivo_cloudinary(self, archivo):
+        """Sube un archivo a Cloudinary y retorna los datos relevantes."""
+        resultado = cloudinary.uploader.upload(
+            archivo,
+            folder='evidencias_proyectos',
+            resource_type='auto'
+        )
+        return {
+            'archivo_url': resultado['secure_url'],
+            'nombre_archivo': archivo.name,
+            'tipo_archivo': archivo.content_type,
+            'tamano_archivo': archivo.size,
+        }
+
+    def validar_archivo(self, archivo):
+        tipos_permitidos = [
+            'image/jpeg',
+            'image/png',
+            'application/pdf'
+        ]
+
+        if archivo.content_type not in tipos_permitidos:
+            return Response(
+                {
+                    'error': 'Tipo de archivo no permitido. Solo se permiten JPG, PNG y PDF.'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        tamano_maximo = 5 * 1024 * 1024
+
+        if archivo.size > tamano_maximo:
+            return Response(
+                {
+                    'error': 'El archivo no debe superar los 5 MB.'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
     def create(self, request, *args, **kwargs):
         archivo = request.FILES.get('archivo')
 
         if not archivo:
             return Response(
-                {'error': 'Debe adjuntar un archivo.'},
+                {
+                    'error': 'Debe adjuntar un archivo.'
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Validar archivo mediante el serializer antes de subir
+        error_archivo = self.validar_archivo(archivo)
+
+        if error_archivo:
+            return error_archivo
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # Subir a Cloudinary solo si el serializer es válido
-        datos_archivo = subir_archivo_cloudinary(archivo)
+        try:
+            datos_archivo = self.subir_archivo_cloudinary(archivo)
+        except Exception as error:
+            return Response(
+                {
+                    'error': 'No se pudo subir el archivo a Cloudinary.',
+                    'detalle': str(error)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
-        serializer.save(**datos_archivo)
+        evidencia = serializer.save(**datos_archivo)
+        respuesta = self.get_serializer(evidencia)
 
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(
+            respuesta.data,
+            status=status.HTTP_201_CREATED
+        )
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
-        instance = self.get_object()
+        evidencia = self.get_object()
         archivo = request.FILES.get('archivo')
 
-        data = request.data.copy()
+        serializer = self.get_serializer(
+            evidencia,
+            data=request.data,
+            partial=partial
+        )
 
-        serializer = self.get_serializer(instance, data=data, partial=partial)
         serializer.is_valid(raise_exception=True)
 
-        # Si viene archivo nuevo, subirlo a Cloudinary
-        if archivo:
-            datos_archivo = subir_archivo_cloudinary(archivo)
-            serializer.save(**datos_archivo)
-        else:
-            serializer.save()
+        datos_archivo = {}
 
-        return Response(serializer.data)
-    
+        if archivo:
+            error_archivo = self.validar_archivo(archivo)
+
+            if error_archivo:
+                return error_archivo
+
+            try:
+                datos_archivo = self.subir_archivo_cloudinary(archivo)
+            except Exception as error:
+                return Response(
+                    {
+                        'error': 'No se pudo subir el archivo a Cloudinary.',
+                        'detalle': str(error)
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+        evidencia_actualizada = serializer.save(**datos_archivo)
+        respuesta = self.get_serializer(evidencia_actualizada)
+
+        return Response(
+            respuesta.data,
+            status=status.HTTP_200_OK
+        )
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        evidencia = self.get_object()
+        evidencia.delete()
+
+        return Response(
+            {
+                'mensaje': 'Evidencia eliminada correctamente.'
+            },
+            status=status.HTTP_200_OK
+        )
+
 
 class GoogleLoginView(APIView):
     permission_classes = [AllowAny]

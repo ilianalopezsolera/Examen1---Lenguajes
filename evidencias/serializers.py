@@ -38,8 +38,15 @@ class EvidenciaSerializer(serializers.ModelSerializer):
         ]
 
     def validate_titulo(self, value):
-        if not value.strip():
-            raise serializers.ValidationError("El título no puede estar vacío.")
+        if not value or not value.strip():
+            raise serializers.ValidationError(
+                "El título de la evidencia no puede estar vacío."
+            )
+
+        if len(value.strip()) < 3:
+            raise serializers.ValidationError(
+                "El título debe tener al menos 3 caracteres."
+            )
         return value.strip()
 
     def validate_proyecto(self, value):
@@ -61,12 +68,21 @@ class EvidenciaSerializer(serializers.ModelSerializer):
         return value
 
     def validate_descripcion(self, value):
-        if not value.strip():
-            raise serializers.ValidationError("La descripción no puede estar vacía.")
-        if len(value) > 500:
+        if not value or not value.strip():
             raise serializers.ValidationError(
-                "La descripción no puede superar los 500 caracteres."
+                "La descripción no puede estar vacía."
             )
+
+        if len(value.strip()) < 10:
+            raise serializers.ValidationError(
+                "La descripción debe tener al menos 10 caracteres."
+            )
+
+        if len(value.strip()) > 1000:
+            raise serializers.ValidationError(
+                "La descripción no debe superar los 1000 caracteres."
+            )
+
         return value.strip()
 
     def validate_archivo(self, archivo):
@@ -83,5 +99,9 @@ class EvidenciaSerializer(serializers.ModelSerializer):
         return archivo
 
     def create(self, validated_data):
-        validated_data.pop('archivo', None)  # ← adentro de la clase
+        validated_data.pop('archivo', None)
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data.pop('archivo', None)
+        return super().update(instance, validated_data)
