@@ -8,11 +8,14 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from django.contrib.auth.models import User
 from django.conf import settings
+from django.shortcuts import redirect
 
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
 import cloudinary.uploader
+import requests as http_requests
+import urllib.parse
 
 from .models import EvidenciaProyecto
 from .serializers import EvidenciaSerializer
@@ -168,6 +171,95 @@ class EvidenciaViewSet(viewsets.ModelViewSet):
         )
 
 
+# ── Google OAuth: inicia el flujo redirigiendo a Google ──────────────────────
+class GoogleAuthRedirectView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        params = {
+             'client_id': settings.GOOGLE_CLIENT_ID,
+    'redirect_uri': settings.GOOGLE_REDIRECT_URI,
+    'response_type': 'code',
+    'scope': 'openid email profile',
+    'access_type': 'offline',
+    'prompt': 'select_account consent',
+    'include_granted_scopes': 'true',
+        }
+        url = 'https://accounts.google.com/o/oauth2/v2/auth?' + urllib.parse.urlencode(params)
+        return redirect(url)
+
+
+# ── Google OAuth: Google regresa aquí y se genera el JWT ────────────────────
+class GoogleCallbackView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        code = request.GET.get('code')
+
+        if not code:
+            return Response(
+                {'error': 'Código de autorización no recibido.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Intercambia el código por tokens de Google
+        token_response = http_requests.post(
+            'https://oauth2.googleapis.com/token',
+            data={
+                'code': code,
+                'client_id': settings.GOOGLE_CLIENT_ID,
+                'client_secret': settings.GOOGLE_CLIENT_SECRET,
+                'redirect_uri': settings.GOOGLE_REDIRECT_URI,
+                'grant_type': 'authorization_code',
+            }
+        )
+        token_data = token_response.json()
+
+        if 'error' in token_data:
+            return Response(
+                {'error': 'No se pudo obtener el token de Google.', 'detalle': token_data},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Obtiene info del usuario desde Google
+        user_info_response = http_requests.get(
+            'https://www.googleapis.com/oauth2/v2/userinfo',
+            headers={'Authorization': f"Bearer {token_data['access_token']}"}
+        )
+        user_info = user_info_response.json()
+
+        email = user_info.get('email')
+        nombre = user_info.get('given_name', '')
+        apellido = user_info.get('family_name', '')
+
+        if not email:
+            return Response(
+                {'error': 'No se pudo obtener el email del usuario.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Crea o busca el usuario en la base de datos
+        user, _ = User.objects.get_or_create(
+            username=email,
+            defaults={
+                'email': email,
+                'first_name': nombre,
+                'last_name': apellido,
+            }
+        )
+
+        # Genera JWT propio
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'email': email,
+            'nombre': f'{nombre} {apellido}'.strip(),
+        })
+
+
+# ── Google OAuth: login con id_token (flujo alternativo desde frontend) ──────
 class GoogleLoginView(APIView):
     permission_classes = [AllowAny]
 
