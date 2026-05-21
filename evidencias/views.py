@@ -1,6 +1,6 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.views import APIView
@@ -30,7 +30,7 @@ def health(request):
 class EvidenciaViewSet(viewsets.ModelViewSet):
     queryset = EvidenciaProyecto.objects.all().order_by('-fecha_registro')
     serializer_class = EvidenciaSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     filterset_fields = ['categoria']
@@ -52,6 +52,7 @@ class EvidenciaViewSet(viewsets.ModelViewSet):
         }
 
     def validar_archivo(self, archivo):
+
         tipos_permitidos = [
             'image/png',
             'image/jpeg',
@@ -79,6 +80,7 @@ class EvidenciaViewSet(viewsets.ModelViewSet):
         return None
 
     def create(self, request, *args, **kwargs):
+
         archivo = request.FILES.get('archivo')
 
         if not archivo:
@@ -99,6 +101,7 @@ class EvidenciaViewSet(viewsets.ModelViewSet):
 
         try:
             datos_archivo = self.subir_archivo_cloudinary(archivo)
+
         except Exception as error:
             return Response(
                 {
@@ -117,6 +120,7 @@ class EvidenciaViewSet(viewsets.ModelViewSet):
         )
 
     def update(self, request, *args, **kwargs):
+
         partial = kwargs.pop('partial', False)
         evidencia = self.get_object()
         archivo = request.FILES.get('archivo')
@@ -132,6 +136,7 @@ class EvidenciaViewSet(viewsets.ModelViewSet):
         datos_archivo = {}
 
         if archivo:
+
             error_archivo = self.validar_archivo(archivo)
 
             if error_archivo:
@@ -139,6 +144,7 @@ class EvidenciaViewSet(viewsets.ModelViewSet):
 
             try:
                 datos_archivo = self.subir_archivo_cloudinary(archivo)
+
             except Exception as error:
                 return Response(
                     {
@@ -161,6 +167,7 @@ class EvidenciaViewSet(viewsets.ModelViewSet):
         return self.update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
+
         evidencia = self.get_object()
         evidencia.delete()
 
@@ -173,9 +180,11 @@ class EvidenciaViewSet(viewsets.ModelViewSet):
 
 
 class GoogleAuthRedirectView(APIView):
+
     permission_classes = [AllowAny]
 
     def get(self, request):
+
         params = {
             'client_id': settings.GOOGLE_CLIENT_ID,
             'redirect_uri': settings.GOOGLE_REDIRECT_URI,
@@ -186,19 +195,27 @@ class GoogleAuthRedirectView(APIView):
             'include_granted_scopes': 'true',
         }
 
-        url = 'https://accounts.google.com/o/oauth2/v2/auth?' + urllib.parse.urlencode(params)
+        url = (
+            'https://accounts.google.com/o/oauth2/v2/auth?'
+            + urllib.parse.urlencode(params)
+        )
+
         return redirect(url)
 
 
 class GoogleCallbackView(APIView):
+
     permission_classes = [AllowAny]
 
     def get(self, request):
+
         code = request.GET.get('code')
 
         if not code:
             return Response(
-                {'error': 'Código de autorización no recibido.'},
+                {
+                    'error': 'Código de autorización no recibido.'
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -226,7 +243,10 @@ class GoogleCallbackView(APIView):
 
         user_info_response = http_requests.get(
             'https://www.googleapis.com/oauth2/v2/userinfo',
-            headers={'Authorization': f"Bearer {token_data['access_token']}"}
+            headers={
+                'Authorization':
+                f"Bearer {token_data['access_token']}"
+            }
         )
 
         user_info = user_info_response.json()
@@ -237,7 +257,9 @@ class GoogleCallbackView(APIView):
 
         if not email:
             return Response(
-                {'error': 'No se pudo obtener el email del usuario.'},
+                {
+                    'error': 'No se pudo obtener el email del usuario.'
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -261,14 +283,18 @@ class GoogleCallbackView(APIView):
 
 
 class GoogleLoginView(APIView):
+
     permission_classes = [AllowAny]
 
     def post(self, request):
+
         token = request.data.get('token')
 
         if not token:
             return Response(
-                {'error': 'Token de Google requerido.'},
+                {
+                    'error': 'Token de Google requerido.'
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -278,9 +304,12 @@ class GoogleLoginView(APIView):
                 google_requests.Request(),
                 settings.GOOGLE_CLIENT_ID
             )
+
         except ValueError:
             return Response(
-                {'error': 'Token de Google inválido o expirado.'},
+                {
+                    'error': 'Token de Google inválido o expirado.'
+                },
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
