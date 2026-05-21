@@ -53,6 +53,7 @@ class EvidenciaViewSet(viewsets.ModelViewSet):
     def validar_archivo(self, archivo):
         tipos_permitidos = [
             'image/png',
+            'image/jpeg',
             'application/pdf'
         ]
 
