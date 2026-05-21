@@ -1,5 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from .views import EvidenciaViewSet, GoogleLoginView
 
 from .views import (
     EvidenciaViewSet,
@@ -19,4 +20,6 @@ urlpatterns = [
     path('auth/google/', GoogleAuthRedirectView.as_view(), name='google-auth-redirect'),
     path('auth/google/callback/', GoogleCallbackView.as_view(), name='google-auth-callback'),
     path('auth/google/login/', GoogleLoginView.as_view(), name='google-login-token'),
+    path('', include(router.urls)),
+    path('auth/google/', GoogleLoginView.as_view(), name='google-login'),
 ]

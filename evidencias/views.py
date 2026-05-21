@@ -1,6 +1,6 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.views import APIView
@@ -30,8 +30,12 @@ def health(request):
 class EvidenciaViewSet(viewsets.ModelViewSet):
     queryset = EvidenciaProyecto.objects.all().order_by('-fecha_registro')
     serializer_class = EvidenciaSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    filterset_fields = ['categoria']
     search_fields = ['titulo', 'proyecto', 'responsable']
+    ordering_fields = ['fecha_registro', 'titulo', 'proyecto']
 
     def subir_archivo_cloudinary(self, archivo):
         resultado = cloudinary.uploader.upload(
@@ -39,16 +43,13 @@ class EvidenciaViewSet(viewsets.ModelViewSet):
             folder='evidencias_proyectos',
             resource_type='auto'
         )
-    
-        return {
 
+        return {
             'archivo_url': resultado['secure_url'],
             'nombre_archivo': archivo.name,
             'tipo_archivo': archivo.content_type,
             'tamano_archivo': archivo.size,
-
         }
-
 
     def validar_archivo(self, archivo):
         tipos_permitidos = [
@@ -74,6 +75,8 @@ class EvidenciaViewSet(viewsets.ModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        return None
 
     def create(self, request, *args, **kwargs):
         archivo = request.FILES.get('archivo')
@@ -169,25 +172,24 @@ class EvidenciaViewSet(viewsets.ModelViewSet):
         )
 
 
-# ── Google OAuth: inicia el flujo redirigiendo a Google ──────────────────────
 class GoogleAuthRedirectView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
         params = {
-             'client_id': settings.GOOGLE_CLIENT_ID,
-    'redirect_uri': settings.GOOGLE_REDIRECT_URI,
-    'response_type': 'code',
-    'scope': 'openid email profile',
-    'access_type': 'offline',
-    'prompt': 'select_account consent',
-    'include_granted_scopes': 'true',
+            'client_id': settings.GOOGLE_CLIENT_ID,
+            'redirect_uri': settings.GOOGLE_REDIRECT_URI,
+            'response_type': 'code',
+            'scope': 'openid email profile',
+            'access_type': 'offline',
+            'prompt': 'select_account consent',
+            'include_granted_scopes': 'true',
         }
+
         url = 'https://accounts.google.com/o/oauth2/v2/auth?' + urllib.parse.urlencode(params)
         return redirect(url)
 
 
-# ── Google OAuth: Google regresa aquí y se genera el JWT ────────────────────
 class GoogleCallbackView(APIView):
     permission_classes = [AllowAny]
 
@@ -200,7 +202,6 @@ class GoogleCallbackView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Intercambia el código por tokens de Google
         token_response = http_requests.post(
             'https://oauth2.googleapis.com/token',
             data={
@@ -211,19 +212,23 @@ class GoogleCallbackView(APIView):
                 'grant_type': 'authorization_code',
             }
         )
+
         token_data = token_response.json()
 
         if 'error' in token_data:
             return Response(
-                {'error': 'No se pudo obtener el token de Google.', 'detalle': token_data},
+                {
+                    'error': 'No se pudo obtener el token de Google.',
+                    'detalle': token_data
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Obtiene info del usuario desde Google
         user_info_response = http_requests.get(
             'https://www.googleapis.com/oauth2/v2/userinfo',
             headers={'Authorization': f"Bearer {token_data['access_token']}"}
         )
+
         user_info = user_info_response.json()
 
         email = user_info.get('email')
@@ -236,7 +241,6 @@ class GoogleCallbackView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Crea o busca el usuario en la base de datos
         user, _ = User.objects.get_or_create(
             username=email,
             defaults={
@@ -246,7 +250,6 @@ class GoogleCallbackView(APIView):
             }
         )
 
-        # Genera JWT propio
         refresh = RefreshToken.for_user(user)
 
         return Response({
@@ -257,7 +260,6 @@ class GoogleCallbackView(APIView):
         })
 
 
-# ── Google OAuth: login con id_token (flujo alternativo desde frontend) ──────
 class GoogleLoginView(APIView):
     permission_classes = [AllowAny]
 

@@ -18,6 +18,10 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 from pathlib import Path
+from datetime import timedelta
+from dotenv import load_dotenv
+
+load_dotenv() 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -56,6 +60,8 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'drf_spectacular',
     'corsheaders',
+    'cloudinary',           
+    'cloudinary_storage', 
 
     #Apps locales
     'evidencias',
@@ -129,7 +135,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Costa_Rica'
 
 USE_I18N = True
 
@@ -140,12 +146,17 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
 
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         
+    ),
+
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',  
     ),
 
     'DEFAULT_SCHEMA_CLASS':
@@ -163,24 +174,32 @@ REST_FRAMEWORK = {
 ],
 }
 
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=2),   # 👈 tiempo de vida del token
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
+
+
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'API Evidencias',
-    'DESCRIPTION': 'API para gestión de evidencias digitales',
+    'TITLE': 'API Evidencias Digitales',
+    'DESCRIPTION': 'API para gestión de evidencias digitales de proyectos',
     'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,  
+    'COMPONENT_SPLIT_REQUEST': True,
+
 }
 
 import cloudinary
 
 cloudinary.config(
-    cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
+     cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
     api_key=os.getenv('CLOUDINARY_API_KEY'),
     api_secret=os.getenv('CLOUDINARY_API_SECRET'),
     secure=True
 )
 
 CORS_ALLOW_ALL_ORIGINS = True
-
-
 
 # ── CONFIGURACIÓN DE GOOGLE OAUTH ───
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', 'tu_client_id_por_defecto')
