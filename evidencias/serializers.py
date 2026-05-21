@@ -26,8 +26,7 @@ class EvidenciaSerializer(serializers.ModelSerializer):
             'fecha_registro',
             'fecha_actualizacion',
         ]
-
-        read_only_fields = [
+        read_only_fields = [  
             'archivo_url',
             'nombre_archivo',
             'tipo_archivo',
