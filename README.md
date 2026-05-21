@@ -47,6 +47,58 @@ Estructuración de flujos automatizados con GitHub Actions en la carpeta `.githu
 Para levantar el entorno de desarrollo localmente, ejecute los siguientes comandos en la terminal:
 
 1. Clonar el repositorio e ingresar al directorio del proyecto.
-2. Instalar las dependencias del sistema:
+
+2. Crear y activar el entorno virtual.
+Bash
+   python -m venv venv
+   venv\Scripts\activate
+
+3. Instalar las dependencias del sistema:
    ```bash
    pip install -r requirements.txt
+
+4. Crear el archivo .env con las variables requeridas:
+CLOUDINARY_CLOUD_NAME=tu_cloud_name
+CLOUDINARY_API_KEY=tu_api_key
+CLOUDINARY_API_SECRET=tu_api_secret
+DJANGO_SECRET_KEY=tu_secret_key
+
+5. Ejecutar migraciones:
+python manage.py makemigrations
+python manage.py migrate
+
+6. Crear un superusuario para la API:
+python manage.py createsuperuser
+
+7. Ejecutar el servidor local:
+python manage.py runserver
+
+
+---
+## Lista de Endpoints Principales
+/api/evidencias/ → CRUD de evidencias
+
+/api/token/ → Obtener token JWT
+
+/api/token/refresh/ → Refrescar token
+
+/api/docs/ → Documentación Swagger de la API
+
+/api/schema/ → Schema OpenAPI
+
+/health/ → Verificación de estado del servidor
+
+---
+## Despliegue
+Subir el proyecto a un repositorio GitHub.
+Configurar Render o servicio de hosting para Django.
+Establecer variables de entorno en el servidor de producción.
+Ejecutar migraciones y crear superusuario en producción.
+
+---
+## Problemas Encontrados y Soluciones Aplicadas
+Conflictos de merge entre ramas → solucionados forzando la rama carlos a coincidir con main.
+Swagger no mostraba selector de archivos → solucionado ajustando FileField en serializers.py y COMPONENT_SPLIT_REQUEST=True.
+Error “No module named django” → solucionado activando el venv y reinstalando dependencias.
+Error de token JWT para usuarios → solucionado creando superusuarios locales con createsuperuser.
+Error “Not Found /api/docs/” → solucionado corrigiendo config/urls.py y evidencias/urls.py sin ciclos.
