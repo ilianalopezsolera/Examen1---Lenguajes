@@ -187,6 +187,12 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,  
     'COMPONENT_SPLIT_REQUEST': True,
+     'SERVERS': [
+        {
+            'url': 'https://examen1-lenguajes.onrender.com',
+            'description': 'Servidor de producción'
+        }
+    ],
 
 }
 
